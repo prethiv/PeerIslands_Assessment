@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-commerce Order System</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1, h2 { color: #333; }
+        .card { background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 25px; }
+        input, select, button { padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007bff; color: white; cursor: pointer; border: none; padding: 10px 15px; }
+        button:hover { background: #0056b3; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background: #007bff; color: white; }
+        .item-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .actions { display: flex; gap: 5px; align-items: center; }
+    </style>
+</head>
+<body>
+
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>E-commerce Order Processor</h1>
+        <div>
+            <a href="/login" style="padding: 10px 15px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">Sign In</a>
+            <a href="/logout" style="padding: 10px 15px; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; margin-left: 5px;">Logout</a>
+        </div>
+    </div>
+
+    <!-- Form to Sign Up -->
+    <div class="card">
+        <h2>Sign Up</h2>
+        <input type="text" id="username" placeholder="User ID (Username)" style="width: calc(50% - 12px);" required>
+        <input type="password" id="password" placeholder="Password" style="width: calc(50% - 12px);" required>
+        <button type="button" onclick="signUp()" style="background: #17a2b8; width: 100%; margin-top: 10px;">Register User</button>
+    </div>
+
+    <!-- Form to submit a new Order -->
+    <div class="card">
+        <h2>Place New Order</h2>
+        <input type="text" id="customerName" placeholder="Enter Customer Name" style="width: 100%; box-sizing: border-box;" required>
+        <br><br>
+        <div id="itemsContainer">
+            <div class="item-row">
+                <input type="text" class="productName" placeholder="Product Name" required>
+                <input type="number" class="quantity" placeholder="Quantity" min="1" required>
+                <input type="number" step="0.01" class="price" placeholder="Unit Price" min="0" required>
+            </div>
+        </div>
+        <button type="button" onclick="addMoreItems()">+ Add Another Item</button>
+        <hr>
+        <button type="button" onclick="submitOrder()" style="background: #28a745; width: 100%;">Submit Order</button>
+    </div>
+
+    <!-- Table to view existing Orders -->
+    <div class="card">
+        <h2>Manage Orders</h2>
+        <label for="statusFilter">Filter by Status:</label>
+        <select id="statusFilter" onchange="loadOrders()">
+            <option value="">All Orders</option>
+            <option value="PENDING">PENDING</option>
+            <option value="PROCESSING">PROCESSING</option>
+            <option value="SHIPPED">SHIPPED</option>
+            <option value="DELIVERED">DELIVERED</option>
+            <option value="CANCELLED">CANCELLED</option>
+        </select>
+        <button onclick="loadOrders()" style="background: #6c757d;">Refresh List</button>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Items Summary</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ordersTableBody">
+                <!-- Filled through JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function signUp() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                alert('Please provide a User ID and Password.');
+                return;
+            }
+            
+            const response = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const msg = await response.text();
+            if (response.ok) {
+                alert(msg);
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+            } else alert('Error: ' + msg);
+        }
+
+        function addMoreItems() {
+            const itemsContainer = document.getElementById('itemsContainer');
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item-row';
+            itemDiv.innerHTML = `
+                <input type="text" class="productName" placeholder="Product Name" required>
+                <input type="number" class="quantity" placeholder="Quantity" min="1" required>
+                <input type="number" step="0.01" class="price" placeholder="Unit Price" min="0" required>
+            `;
+            itemsContainer.appendChild(itemDiv);
+        }
+
+        async function submitOrder() {
+            const customerName = document.getElementById('customerName').value;
+            const items = [];
+            document.querySelectorAll('.item-row').forEach(row => {
+                const productName = row.querySelector('.productName').value;
+                const quantity = row.querySelector('.quantity').value;
+                const price = row.querySelector('.price').value;
+                if (productName && quantity && price) {
+                    items.push({ productName, quantity: parseInt(quantity), price: parseFloat(price) });
+                }
+            });
+
+            if (!customerName || items.length === 0) {
+                alert('Please provide a customer name and at least one complete item.');
+                return;
+            }
+
+            const response = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customerName, items })
+            });
+            
+            if (response.ok) {
+                alert('Successfully created new Order!');
+                document.getElementById('customerName').value = ''; // Reset Form
+                loadOrders(); // Refresh table
+            }
+        }
+
+        async function loadOrders() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            let url = '/api/orders' + (statusFilter ? `?status=${statusFilter}` : '');
+            const response = await fetch(url);
+            
+            // If not authenticated, Spring Security redirects fetch to the login page
+            if (response.redirected && response.url.includes('/login')) {
+                document.getElementById('ordersTableBody').innerHTML = '<tr><td colspan="5" style="text-align: center; color: red;">You must be logged in to view and create orders. Please click <b>Sign In</b> above.</td></tr>';
+                return;
+            }
+
+            const orders = await response.json();
+            
+            const tbody = document.getElementById('ordersTableBody');
+            tbody.innerHTML = '';
+            orders.forEach(order => {
+                const itemsSummary = order.items.map(i => `${i.productName} (x${i.quantity})`).join(', ');
+                let cancelBtn = order.status === 'PENDING' ? `<button onclick="cancelOrder(${order.id})" style="background: #dc3545; padding: 5px 10px;">Cancel</button>` : '';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td>#${order.id}</td>
+                        <td>${order.customerName}</td>
+                        <td><strong>${order.status}</strong></td>
+                        <td>${itemsSummary}</td>
+                        <td class="actions">
+                            ${cancelBtn}
+                            <select onchange="updateStatus(${order.id}, this.value)">
+                                <option value="">Move status to...</option>
+                                <option value="PROCESSING">PROCESSING</option>
+                                <option value="SHIPPED">SHIPPED</option>
+                                <option value="DELIVERED">DELIVERED</option>
+                            </select>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function cancelOrder(id) { if ((await fetch(`/api/orders/${id}/cancel`, { method: 'POST' })).ok) loadOrders(); }
+        async function updateStatus(id, newStatus) { if (newStatus && (await fetch(`/api/orders/${id}/status?status=${newStatus}`, { method: 'PATCH' })).ok) loadOrders(); }
+
+        window.onload = loadOrders;
+    </script>
+</body>
+</html>
